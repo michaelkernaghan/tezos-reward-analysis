@@ -2,240 +2,274 @@ import React, { useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts';
 
 const RewardAnalysis = () => {
- // Baker parameters
- const [bakerBalance, setBakerBalance] = useState(10000); // Default 10,000 φ
- const [cycleLength] = useState(2.84); // Days per cycle
- const [baseStakingRate] = useState(0.10); // 10% base rate
- const [opportunityVariance] = useState({
-   min: -0.592, // -59.2% worst case
-   max: 27.305  // +2,730.5% best case
- });
- const [efficiencyTarget] = useState(0.9845); // 98.45% target from history
+    // Baker parameters from real data
+    const [bakingStats] = useState({
+        stakingBalance: 1889.165879,
+        fillRate: 0.10,
+        shareRate: 0.00019,
+        baseOpportunity: 0.03,
+        cycleLength: 2.84,
+        efficiency: 1.0002,
+        reliability: 0.7737,
+        luckRange: {
+            min: -0.589, // Current -58.9%
+            max: 27.3053 // Historic +2,730.53%
+        },
+        actualROI: 2.3948 // 239.48%
+    });
 
- // DCP Review parameters
- const [baseStake, setBaseStake] = useState(100);
- const [projectPool, setProjectPool] = useState(1000);
- const [reviewsPerCycle, setReviewsPerCycle] = useState(8); // Adjusted for cycle length
- const [totalReviewers, setTotalReviewers] = useState(5);
+    // Review parameters
+    const [baseStake, setBaseStake] = useState(100);
+    const [projectPool, setProjectPool] = useState(1000);
+    const [reviewsPerCycle, setReviewsPerCycle] = useState(8);
+    const [totalReviewers, setTotalReviewers] = useState(5);
+    const [filmHoldings, setFilmHoldings] = useState(1000);
+    const [reputation, setReputation] = useState(1.0);
+    const [avgReviewTime, setAvgReviewTime] = useState(12); // hours
 
- // Format numbers with φ symbol
- const formatFilm = (value) => `φ ${value.toLocaleString()}`;
+    // Weight constants
+    const WEIGHTS = {
+        reputation: 0.40,
+        stake: 0.40,
+        timing: 0.10,
+        holdings: 0.05,
+        confidence: 0.05
+    };
 
- const calculateCycleReward = (balance) => {
-   const baseReward = balance * (baseStakingRate / 73); // 73 cycles per year
-   // Randomly simulate opportunity variance within historic range
-   const opportunityMultiplier = 1 + (Math.random() * (opportunityVariance.max - opportunityVariance.min) + opportunityVariance.min);
-   const efficiency = Math.random() * (1 - efficiencyTarget) + efficiencyTarget;
-   return baseReward * opportunityMultiplier * efficiency;
- };
+    const calculateBakingReward = (balance) => {
+        const baseReward = balance * bakingStats.shareRate;
+        const opportunityReward = bakingStats.baseOpportunity;
+        const luckMultiplier = 1 + (Math.random() *
+            (bakingStats.luckRange.max - bakingStats.luckRange.min) +
+            bakingStats.luckRange.min);
 
- const generateData = () => {
-   const data = [];
-   let currentReputation = 1;
-   let bakingBalance = bakerBalance;
-   let reviewBalance = bakerBalance;
-   let totalStake = baseStake * totalReviewers;
-   let cycleEfficiency = [];
+        return (baseReward + opportunityReward) *
+            luckMultiplier *
+            bakingStats.efficiency;
+    };
 
-   // Simulate 73 cycles (1 year)
-   for (let cycle = 1; cycle <= 73; cycle++) {
-     // Baking strategy with real variance
-     const cycleReward = calculateCycleReward(bakingBalance);
-     bakingBalance += cycleReward;
-     
-     // Track efficiency
-     const efficiency = cycleReward / (bakingBalance * (baseStakingRate / 73));
-     cycleEfficiency.push(efficiency);
+    const calculateReviewWeight = (reviewData) => {
+        const {
+            reputation,
+            stake,
+            reviewTime,
+            holdings,
+            totalStake
+        } = reviewData;
 
-     // Review strategy
-     let cycleReviewReward = 0;
-     for (let review = 0; review < reviewsPerCycle; review++) {
-       const reviewReward = (baseStake * (projectPool / totalStake)) * currentReputation;
-       cycleReviewReward += reviewReward;
-     }
+        // Normalized scores (0-1)
+        const reputationScore = Math.min(reputation / 2.0, 1);
+        const stakeScore = stake / totalStake;
+        const timingScore = Math.max(0, 1 - (reviewTime / 24));
+        const holdingsScore = Math.min(holdings / 10000, 1);
+        const confidenceScore = Math.min(stake / holdings, 1);
 
-     reviewBalance += cycleReviewReward;
-     reviewBalance -= (baseStake * reviewsPerCycle); // Account for staking costs
+        return (
+            (reputationScore * WEIGHTS.reputation) +
+            (stakeScore * WEIGHTS.stake) +
+            (timingScore * WEIGHTS.timing) +
+            (holdingsScore * WEIGHTS.holdings) +
+            (confidenceScore * WEIGHTS.confidence)
+        );
+    };
 
-     // Update reputation based on successful reviews
-     currentReputation *= (1 + 0.05 * reviewsPerCycle);
+    const generateData = () => {
+        const data = [];
+        let currentReputation = reputation;
+        let bakingBalance = bakingStats.stakingBalance;
+        let reviewBalance = bakingStats.stakingBalance;
+        let totalStake = baseStake * totalReviewers;
 
-     data.push({
-       cycle,
-       days: Math.round(cycle * cycleLength),
-       bakingBalance: Math.round(bakingBalance),
-       reviewBalance: Math.round(reviewBalance),
-       reputation: Math.round(currentReputation * 100) / 100,
-       cycleReward: Math.round(cycleReward),
-       efficiency: Math.round(efficiency * 10000) / 100, // Convert to percentage
-       accumulatedRewards: Math.round(bakingBalance - bakerBalance)
-     });
-   }
-   return data;
- };
+        for (let cycle = 1; cycle <= 73; cycle++) {
+            // Baking rewards
+            const bakingReward = calculateBakingReward(bakingBalance);
+            bakingBalance += bakingReward;
 
- const data = generateData();
+            // Review rewards
+            let cycleReviewReward = 0;
+            for (let review = 0; review < reviewsPerCycle; review++) {
+                const weight = calculateReviewWeight({
+                    reputation: currentReputation,
+                    stake: baseStake,
+                    reviewTime: avgReviewTime,
+                    holdings: filmHoldings,
+                    totalStake
+                });
 
- // Custom tooltip to show cycle details
- const CustomTooltip = ({ active, payload, label }) => {
-   if (active && payload && payload.length) {
-     return (
-       <div className="bg-white p-2 border rounded shadow">
-         <p className="text-sm font-bold">Cycle: {label} (Day {payload[0]?.payload.days})</p>
-         {payload.map((entry, index) => (
-           <p key={index} style={{ color: entry.color }}>
-             {entry.name}: {entry.name.includes('Balance') || entry.name.includes('Reward') ? 
-               formatFilm(entry.value) : 
-               entry.name === 'Efficiency' ? 
-                 `${entry.value}%` : 
-                 entry.value}
-           </p>
-         ))}
-       </div>
-     );
-   }
-   return null;
- };
+                const reviewReward = projectPool * weight;
+                cycleReviewReward += reviewReward;
+            }
 
- return (
-   <div className="p-4 max-w-4xl mx-auto">
-     <h2 className="text-2xl font-bold mb-4">Baking vs Review Analysis (Cycle-based)</h2>
+            // Update balances and reputation
+            reviewBalance += cycleReviewReward;
+            reviewBalance -= (baseStake * reviewsPerCycle);
+            currentReputation *= (1 + 0.05 * reviewsPerCycle);
 
-     <div className="mb-8 p-4 border rounded-lg bg-gray-50">
-       <h3 className="text-xl mb-4">Parameters</h3>
-       <div className="grid grid-cols-2 gap-4">
-         <div>
-           <label className="block mb-2 font-medium">Baker's Balance (φ)</label>
-           <input 
-             type="number" 
-             value={bakerBalance}
-             onChange={(e) => setBakerBalance(Number(e.target.value))}
-             className="w-full p-2 border rounded"
-             min="0"
-             step="1000"
-           />
-         </div>
-         <div>
-           <label className="block mb-2 font-medium">Reviews per Cycle</label>
-           <input 
-             type="number"
-             value={reviewsPerCycle}
-             onChange={(e) => setReviewsPerCycle(Number(e.target.value))}
-             className="w-full p-2 border rounded"
-             min="0"
-           />
-         </div>
-         <div>
-           <label className="block mb-2 font-medium">Base Stake (φ)</label>
-           <input 
-             type="number"
-             value={baseStake}
-             onChange={(e) => setBaseStake(Number(e.target.value))}
-             className="w-full p-2 border rounded"
-             min="0"
-           />
-         </div>
-         <div>
-           <label className="block mb-2 font-medium">Project Pool (φ)</label>
-           <input 
-             type="number"
-             value={projectPool}
-             onChange={(e) => setProjectPool(Number(e.target.value))}
-             className="w-full p-2 border rounded"
-             min="0"
-           />
-         </div>
-         <div>
-           <label className="block mb-2 font-medium">Total Reviewers</label>
-           <input 
-             type="number"
-             value={totalReviewers}
-             onChange={(e) => setTotalReviewers(Math.max(1, Number(e.target.value)))}
-             className="w-full p-2 border rounded"
-             min="1"
-           />
-         </div>
-       </div>
-     </div>
+            data.push({
+                cycle,
+                days: Math.round(cycle * bakingStats.cycleLength),
+                bakingBalance: Math.round(bakingBalance * 100000) / 100000,
+                reviewBalance: Math.round(reviewBalance * 100000) / 100000,
+                reputation: Math.round(currentReputation * 100) / 100,
+                bakingReward: Math.round(bakingReward * 100000) / 100000,
+                reviewReward: Math.round(cycleReviewReward * 100000) / 100000,
+                weight: Math.round(calculateReviewWeight({
+                    reputation: currentReputation,
+                    stake: baseStake,
+                    reviewTime: avgReviewTime,
+                    holdings: filmHoldings,
+                    totalStake
+                }) * 100)
+            });
+        }
+        return data;
+    };
 
-     <div className="mb-8">
-       <h3 className="text-xl mb-4">Balance Comparison by Cycle</h3>
-       <LineChart 
-         width={800}
-         height={400}
-         data={data}
-         margin={{
-           top: 20,
-           right: 30,
-           left: 60,
-           bottom: 20
-         }}
-       >
-         <CartesianGrid strokeDasharray="3 3" />
-         <XAxis 
-           dataKey="cycle" 
-           label={{ 
-             value: 'Cycle', 
-             position: 'insideBottom',
-             offset: -10
-           }} 
-         />
-         <YAxis 
-           label={{ 
-             value: 'Balance (φ)', 
-             angle: -90, 
-             position: 'insideLeft',
-             offset: -50
-           }}
-           tickFormatter={formatFilm}
-         />
-         <Tooltip content={<CustomTooltip />} />
-         <Legend verticalAlign="top" height={36} />
-         <Line type="monotone" dataKey="bakingBalance" stroke="#8884d8" name="Baking Balance" />
-         <Line type="monotone" dataKey="reviewBalance" stroke="#82ca9d" name="Review Balance" />
-       </LineChart>
-     </div>
+    const data = generateData();
 
-     <div className="mb-8">
-       <h3 className="text-xl mb-4">Baking Efficiency by Cycle</h3>
-       <LineChart 
-         width={800}
-         height={300}
-         data={data}
-         margin={{
-           top: 20,
-           right: 30,
-           left: 60,
-           bottom: 20
-         }}
-       >
-         <CartesianGrid strokeDasharray="3 3" />
-         <XAxis dataKey="cycle" />
-         <YAxis 
-           label={{ 
-             value: 'Efficiency (%)', 
-             angle: -90, 
-             position: 'insideLeft',
-             offset: -50
-           }}
-         />
-         <Tooltip content={<CustomTooltip />} />
-         <Legend verticalAlign="top" height={36} />
-         <Line type="monotone" dataKey="efficiency" stroke="#ff7300" name="Efficiency" />
-       </LineChart>
-     </div>
+    return (
+        <div className="p-4 max-w-4xl mx-auto">
+            <h2 className="text-2xl font-bold mb-4">Review vs Baking Returns (With Real Baking Data)</h2>
 
-     <div className="space-y-4">
-       <h3 className="text-xl">Historic Performance Metrics</h3>
-       <ul className="list-disc pl-6">
-         <li>Base Staking Rate: {baseStakingRate * 100}%</li>
-         <li>Cycle Length: {cycleLength} days</li>
-         <li>Historic Efficiency Range: {efficiencyTarget * 100}%</li>
-         <li>Opportunity Range: {opportunityVariance.min * 100}% to +{opportunityVariance.max * 100}%</li>
-       </ul>
-     </div>
-   </div>
- );
+            {/* Baking Stats Display */}
+            <div className="mb-8 p-4 border rounded-lg bg-blue-50">
+                <h3 className="text-xl mb-4">Current Baking Statistics</h3>
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <p className="font-semibold">Staking Balance: {bakingStats.stakingBalance} φ</p>
+                        <p>Fill Rate: {bakingStats.fillRate * 100}%</p>
+                        <p>Share Rate: {bakingStats.shareRate * 100}%</p>
+                    </div>
+                    <div>
+                        <p>Efficiency: {(bakingStats.efficiency * 100).toFixed(2)}%</p>
+                        <p>Reliability: {(bakingStats.reliability * 100).toFixed(2)}%</p>
+                        <p>ROI: {(bakingStats.actualROI * 100).toFixed(2)}%</p>
+                    </div>
+                </div>
+            </div>
+
+            {/* Parameters Section */}
+            <div className="mb-8 p-4 border rounded-lg bg-gray-50">
+                <h3 className="text-xl mb-4">Review Parameters</h3>
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block mb-2">Base Stake per Review (φ)</label>
+                        <input
+                            type="number"
+                            value={baseStake}
+                            onChange={(e) => setBaseStake(Number(e.target.value))}
+                            className="w-full p-2 border rounded"
+                            min="0"
+                        />
+                    </div>
+                    <div>
+                        <label className="block mb-2">Project Pool (φ)</label>
+                        <input
+                            type="number"
+                            value={projectPool}
+                            onChange={(e) => setProjectPool(Number(e.target.value))}
+                            className="w-full p-2 border rounded"
+                            min="0"
+                        />
+                    </div>
+                    <div>
+                        <label className="block mb-2">Reviews per Cycle</label>
+                        <input
+                            type="number"
+                            value={reviewsPerCycle}
+                            onChange={(e) => setReviewsPerCycle(Number(e.target.value))}
+                            className="w-full p-2 border rounded"
+                            min="0"
+                        />
+                    </div>
+                    <div>
+                        <label className="block mb-2">Total Reviewers</label>
+                        <input
+                            type="number"
+                            value={totalReviewers}
+                            onChange={(e) => setTotalReviewers(Math.max(1, Number(e.target.value)))}
+                            className="w-full p-2 border rounded"
+                            min="1"
+                        />
+                    </div>
+                    <div>
+                        <label className="block mb-2">FILM Holdings (φ)</label>
+                        <input
+                            type="number"
+                            value={filmHoldings}
+                            onChange={(e) => setFilmHoldings(Number(e.target.value))}
+                            className="w-full p-2 border rounded"
+                            min="0"
+                        />
+                    </div>
+                    <div>
+                        <label className="block mb-2">Average Review Time (hours)</label>
+                        <input
+                            type="number"
+                            value={avgReviewTime}
+                            onChange={(e) => setAvgReviewTime(Number(e.target.value))}
+                            className="w-full p-2 border rounded"
+                            min="0"
+                            max="24"
+                        />
+                    </div>
+                    <div>
+                        <label className="block mb-2">Starting Reputation</label>
+                        <input
+                            type="number"
+                            value={reputation}
+                            onChange={(e) => setReputation(Number(e.target.value))}
+                            className="w-full p-2 border rounded"
+                            step="0.1"
+                            min="0"
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Charts */}
+            <div className="mb-8">
+                <h3 className="text-xl mb-4">Balance Comparison</h3>
+                <LineChart
+                    width={800}
+                    height={400}
+                    data={data}
+                    margin={{ top: 20, right: 30, left: 60, bottom: 20 }}
+                >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis
+                        dataKey="cycle"
+                        label={{ value: 'Cycle', position: 'insideBottom', offset: -10 }}
+                    />
+                    <YAxis
+                        label={{ value: 'Balance (φ)', angle: -90, position: 'insideLeft', offset: -50 }}
+                    />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="bakingBalance" stroke="#8884d8" name="Baking Balance" />
+                    <Line type="monotone" dataKey="reviewBalance" stroke="#82ca9d" name="Review Balance" />
+                </LineChart>
+            </div>
+
+            <div className="mb-8">
+                <h3 className="text-xl mb-4">Rewards per Cycle</h3>
+                <LineChart
+                    width={800}
+                    height={300}
+                    data={data}
+                    margin={{ top: 20, right: 30, left: 60, bottom: 20 }}
+                >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="cycle" />
+                    <YAxis label={{ value: 'Rewards (φ)', angle: -90, position: 'insideLeft', offset: -50 }} />
+                    <Tooltip />
+                    <Legend />
+                    <Line type="monotone" dataKey="bakingReward" stroke="#8884d8" name="Baking Reward" />
+                    <Line type="monotone" dataKey="reviewReward" stroke="#82ca9d" name="Review Reward" />
+                </LineChart>
+            </div>
+        </div>
+    );
 };
 
 export default RewardAnalysis;
