@@ -353,8 +353,10 @@ const RewardAnalysis = () => {
                             min="0"
                         />
                         <p className="text-sm text-gray-600 mt-1">
-                            Amount you lock while reviewing. Higher stakes = larger share of rewards (40% weight).
-                            Your stake is always returned after review completion.
+                            {weightSystem === 'current'
+                                ? `Amount locked while reviewing. Affects rewards (${WEIGHT_SYSTEMS.current.weights.stake * 100}% weight).`
+                                : `Staking affects rewards (${WEIGHT_SYSTEMS.proposed.weights.staking * 100}% weight).`
+                            }
                         </p>
                     </div>
                     <div>
@@ -411,7 +413,10 @@ const RewardAnalysis = () => {
                             min="0"
                         />
                         <p className="text-sm text-gray-600 mt-1">
-                            Total FILM in your wallet. Affects rewards weighting (5%) and confidence ratio.
+                            {weightSystem === 'current'
+                                ? `Total FILM in wallet. Affects rewards (${WEIGHT_SYSTEMS.current.weights.holdings * 100}% weight) and confidence ratio.`
+                                : `Holdings contribute to impact score (part of ${WEIGHT_SYSTEMS.proposed.weights.impact * 100}% impact weight).`
+                            }
                         </p>
                     </div>
                     <div>
@@ -428,7 +433,10 @@ const RewardAnalysis = () => {
                             <option value="23">Very Slow (23 hours - 4% timing bonus)</option>
                         </select>
                         <p className="text-sm text-gray-600 mt-1">
-                            Earlier reviews receive higher rewards. Timing accounts for 10% of total reward weight.
+                            {weightSystem === 'current'
+                                ? `Earlier reviews receive higher rewards (${WEIGHT_SYSTEMS.current.weights.timing * 100}% weight).`
+                                : `Timing contributes to community participation (part of ${WEIGHT_SYSTEMS.proposed.weights.community * 100}% community weight).`
+                            }
                         </p>
                     </div>
                     <div>
@@ -442,7 +450,10 @@ const RewardAnalysis = () => {
                             min="0"
                         />
                         <p className="text-sm text-gray-600 mt-1">
-                            Your reputation score impacts rewards (40% weight). Grows with successful reviews.
+                            {weightSystem === 'current'
+                                ? `Your reputation score impacts rewards (${WEIGHT_SYSTEMS.current.weights.reputation * 100}% weight). Grows with successful reviews.`
+                                : `User ranking affects rewards (${WEIGHT_SYSTEMS.proposed.weights.ranking * 100}% weight) as part of the community-focused model.`
+                            }
                         </p>
                     </div>
                 </div>
