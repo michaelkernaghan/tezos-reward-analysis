@@ -1,10 +1,15 @@
 import React from 'react';
-import RewardAnalysis from './components/RewardAnalysis';
+import ReputationCalculator from './components/ReputationCalculator';
+import EnhancedMathExplanations from './components/EnhancedMathExplanations';
+import ReputationExplainer from './components/ReputationExplainer';
 
 function App() {
   return (
     <div className="App">
-      <RewardAnalysis />
+      <ReputationExplainer />
+      <ReputationCalculator />
+      <EnhancedMathExplanations />
+
     </div>
   );
 }
