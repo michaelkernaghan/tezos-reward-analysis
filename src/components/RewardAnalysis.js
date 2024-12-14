@@ -1,5 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip } from 'recharts';
+
+// Help Icon SVG Component
+const InfoIcon = () => (
+    <svg 
+        className="w-4 h-4 text-gray-500" 
+        viewBox="0 0 24 24" 
+        fill="none" 
+        stroke="currentColor" 
+        strokeWidth="2"
+    >
+        <circle cx="12" cy="12" r="10" />
+        <line x1="12" y1="16" x2="12" y2="12" />
+        <line x1="12" y1="8" x2="12" y2="8" />
+    </svg>
+);
 
 // Weight systems based on community discussion
 const WEIGHT_SYSTEMS = {
@@ -12,7 +27,13 @@ const WEIGHT_SYSTEMS = {
             holdings: 0.05,
             confidence: 0.05
         },
-        description: "Current system implemented in smart contracts. Emphasizes reputation and stake equally."
+        description: "Current system implemented in smart contracts. Emphasizes reputation and stake equally.",
+        helpText: {
+            stake: "Amount locked while reviewing. Higher stakes increase your share of rewards (40% weight).",
+            holdings: "Total FILM in wallet. Affects rewards (5% weight) and confidence ratio.",
+            timing: "Earlier reviews receive higher rewards (10% weight). Faster response times boost your reward share.",
+            reputation: "Reputation score impacts rewards (40% weight). Grows with successful reviews."
+        }
     },
     proposed: {
         name: "Community Focused (Proposed)",
@@ -22,7 +43,13 @@ const WEIGHT_SYSTEMS = {
             staking: 0.15,
             ranking: 0.10
         },
-        description: "Community proposal emphasizing direct participation and project impact."
+        description: "Community proposal emphasizing direct participation and project impact.",
+        helpText: {
+            stake: "Staking affects rewards (15% weight) as part of the community-focused model.",
+            holdings: "Holdings contribute to impact score (part of 25% impact weight).",
+            timing: "Response time contributes to community participation (part of 50% community weight).",
+            reputation: "User ranking affects rewards (10% weight) in the community-focused model."
+        }
     }
 };
 
@@ -63,21 +90,9 @@ const PRESET_SCENARIOS = {
     }
 };
 
-const RewardAnalysis = () => {
-    // State for parameters
-    const [weightSystem, setWeightSystem] = useState('current');
-    const [baseStake, setBaseStake] = useState(PRESET_SCENARIOS.casual.baseStake);
-    const [projectPool, setProjectPool] = useState(PRESET_SCENARIOS.casual.projectPool);
-    const [reviewsPerCycle, setReviewsPerCycle] = useState(PRESET_SCENARIOS.casual.reviewsPerCycle);
-    const [totalReviewers, setTotalReviewers] = useState(PRESET_SCENARIOS.casual.totalReviewers);
-    const [filmHoldings, setFilmHoldings] = useState(PRESET_SCENARIOS.casual.filmHoldings);
-    const [reputation, setReputation] = useState(PRESET_SCENARIOS.casual.reputation);
-    const [avgReviewTime, setAvgReviewTime] = useState(PRESET_SCENARIOS.casual.avgReviewTime);
-    const [showFormulas, setShowFormulas] = useState(false);
-
-    // Formula documentation from smart contracts
-    const formulaDoc = {
-        weight: `
+// Formula documentation from smart contracts
+const formulaDoc = {
+    weight: `
    // From smart contract KT1HnUrq3KkSbjM92vypZhXqznUxQkBgapJu
    calculateReviewWeight = (reviewData) => {
      const reputationScore = Math.min(reputation / 2.0, 1);     // Cap at 1.0
@@ -94,7 +109,7 @@ const RewardAnalysis = () => {
        (confidenceScore * 0.05)     // 5% weight
      );
    }`,
-        reward: `
+    reward: `
    // Reward calculation
    const reviewReward = projectPool * weight;
    
@@ -104,12 +119,44 @@ const RewardAnalysis = () => {
    // 3. Number of reviews in cycle
    // 4. Reputation growth over time
    `,
-        reputation: `
+    reputation: `
    // Reputation growth
    reputation *= (1 + 0.02 * reviewsPerCycle / Math.sqrt(cycle));
    reputation = Math.min(reputation, MAX_REPUTATION);  // Cap at 5.0
    `
-    };
+};
+
+const ParameterHelp = ({ title, description }) => (
+    <div className="group relative inline-block ml-2">
+        <InfoIcon />
+        <div className="invisible group-hover:visible absolute z-10 w-64 p-2 mt-2 text-sm bg-gray-800 text-white rounded shadow-lg">
+            <p className="font-bold">{title}</p>
+            <p>{description}</p>
+        </div>
+    </div>
+);
+
+const RewardAnalysis = () => {
+    // State for parameters
+    const [weightSystem, setWeightSystem] = useState('current');
+    const [baseStake, setBaseStake] = useState(PRESET_SCENARIOS.casual.baseStake);
+    const [projectPool, setProjectPool] = useState(PRESET_SCENARIOS.casual.projectPool);
+    const [reviewsPerCycle, setReviewsPerCycle] = useState(PRESET_SCENARIOS.casual.reviewsPerCycle);
+    const [totalReviewers, setTotalReviewers] = useState(PRESET_SCENARIOS.casual.totalReviewers);
+    const [filmHoldings, setFilmHoldings] = useState(PRESET_SCENARIOS.casual.filmHoldings);
+    const [reputation, setReputation] = useState(PRESET_SCENARIOS.casual.reputation);
+    const [avgReviewTime, setAvgReviewTime] = useState(PRESET_SCENARIOS.casual.avgReviewTime);
+    const [showFormulas, setShowFormulas] = useState(false);
+
+    const loadPreset = useCallback((scenario) => {
+        setBaseStake(scenario.baseStake);
+        setProjectPool(scenario.projectPool);
+        setReviewsPerCycle(scenario.reviewsPerCycle);
+        setTotalReviewers(scenario.totalReviewers);
+        setFilmHoldings(scenario.filmHoldings);
+        setReputation(scenario.reputation);
+        setAvgReviewTime(scenario.avgReviewTime);
+    }, []);
 
     const calculateReviewWeight = (reviewData) => {
         const {
@@ -136,7 +183,7 @@ const RewardAnalysis = () => {
             );
         } else {
             // Proposed community-focused system
-            const communityScore = Math.min(reputation / 2.0, 1); // Using reputation as proxy for now
+            const communityScore = Math.min(reputation / 2.0, 1);
             const impactScore = Math.random(); // Placeholder - would need real impact metrics
             const stakingScore = stake / totalStake;
             const rankingScore = Math.min(reputation / 5.0, 1);
@@ -148,16 +195,6 @@ const RewardAnalysis = () => {
                 (rankingScore * WEIGHT_SYSTEMS.proposed.weights.ranking)
             );
         }
-    };
-
-    const loadPreset = (scenario) => {
-        setBaseStake(scenario.baseStake);
-        setProjectPool(scenario.projectPool);
-        setReviewsPerCycle(scenario.reviewsPerCycle);
-        setTotalReviewers(scenario.totalReviewers);
-        setFilmHoldings(scenario.filmHoldings);
-        setReputation(scenario.reputation);
-        setAvgReviewTime(scenario.avgReviewTime);
     };
 
     const generateData = () => {
@@ -321,7 +358,6 @@ const RewardAnalysis = () => {
                     {WEIGHT_SYSTEMS[weightSystem].description}
                 </p>
             </div>
-
             {/* Preset Scenarios */}
             <div className="mb-8 p-4 border rounded-lg bg-green-50">
                 <h3 className="text-xl mb-4">Preset Scenarios</h3>
@@ -344,7 +380,13 @@ const RewardAnalysis = () => {
                 <h3 className="text-xl mb-4">Review Parameters</h3>
                 <div className="grid grid-cols-2 gap-4">
                     <div>
-                        <label className="block mb-2">Base Stake per Review (φ)</label>
+                        <label className="flex items-center mb-2">
+                            Base Stake per Review (φ)
+                            <ParameterHelp
+                                title="Stake Impact"
+                                description={WEIGHT_SYSTEMS[weightSystem].helpText.stake}
+                            />
+                        </label>
                         <input
                             type="number"
                             value={baseStake}
@@ -352,12 +394,6 @@ const RewardAnalysis = () => {
                             className="w-full p-2 border rounded"
                             min="0"
                         />
-                        <p className="text-sm text-gray-600 mt-1">
-                            {weightSystem === 'current'
-                                ? `Amount locked while reviewing. Affects rewards (${WEIGHT_SYSTEMS.current.weights.stake * 100}% weight).`
-                                : `Staking affects rewards (${WEIGHT_SYSTEMS.proposed.weights.staking * 100}% weight).`
-                            }
-                        </p>
                     </div>
                     <div>
                         <label className="block mb-2">Project Pool (φ)</label>
@@ -369,12 +405,11 @@ const RewardAnalysis = () => {
                             min="0"
                         />
                         <p className="text-sm text-gray-600 mt-1">
-                            Total rewards available for a project. Distributed among reviewers based on their
-                            stake, reputation, timing, and holdings.
+                            Total rewards available for a project.
                         </p>
                     </div>
                     <div>
-                        <label className="block mb-2">Reviews per Cycle (2.84 days)</label>
+                        <label className="block mb-2">Reviews per Cycle</label>
                         <select
                             value={reviewsPerCycle}
                             onChange={(e) => setReviewsPerCycle(Number(e.target.value))}
@@ -386,9 +421,6 @@ const RewardAnalysis = () => {
                             <option value="8">Very Active (8 reviews per cycle)</option>
                             <option value="10">Full Time (10+ reviews per cycle)</option>
                         </select>
-                        <p className="text-sm text-gray-600 mt-1">
-                            More reviews increase total rewards but require more time and stake commitment.
-                        </p>
                     </div>
                     <div>
                         <label className="block mb-2">Total Reviewers</label>
@@ -399,12 +431,15 @@ const RewardAnalysis = () => {
                             className="w-full p-2 border rounded"
                             min="1"
                         />
-                        <p className="text-sm text-gray-600 mt-1">
-                            Number of reviewers competing for the project pool. Affects your stake weight.
-                        </p>
                     </div>
                     <div>
-                        <label className="block mb-2">FILM Holdings (φ)</label>
+                        <label className="flex items-center mb-2">
+                            FILM Holdings (φ)
+                            <ParameterHelp
+                                title="Holdings Impact"
+                                description={WEIGHT_SYSTEMS[weightSystem].helpText.holdings}
+                            />
+                        </label>
                         <input
                             type="number"
                             value={filmHoldings}
@@ -412,35 +447,35 @@ const RewardAnalysis = () => {
                             className="w-full p-2 border rounded"
                             min="0"
                         />
-                        <p className="text-sm text-gray-600 mt-1">
-                            {weightSystem === 'current'
-                                ? `Total FILM in wallet. Affects rewards (${WEIGHT_SYSTEMS.current.weights.holdings * 100}% weight) and confidence ratio.`
-                                : `Holdings contribute to impact score (part of ${WEIGHT_SYSTEMS.proposed.weights.impact * 100}% impact weight).`
-                            }
-                        </p>
                     </div>
                     <div>
-                        <label className="block mb-2">Review Response Time</label>
+                        <label className="flex items-center mb-2">
+                            Review Response Time
+                            <ParameterHelp
+                                title="Timing Impact"
+                                description={WEIGHT_SYSTEMS[weightSystem].helpText.timing}
+                            />
+                        </label>
                         <select
                             value={avgReviewTime}
                             onChange={(e) => setAvgReviewTime(Number(e.target.value))}
                             className="w-full p-2 border rounded"
                         >
-                            <option value="1">Very Fast (1 hour - 96% timing bonus)</option>
-                            <option value="6">Fast (6 hours - 75% timing bonus)</option>
-                            <option value="12">Medium (12 hours - 50% timing bonus)</option>
-                            <option value="18">Slow (18 hours - 25% timing bonus)</option>
-                            <option value="23">Very Slow (23 hours - 4% timing bonus)</option>
+                            <option value="1">Very Fast (1 hour)</option>
+                            <option value="6">Fast (6 hours)</option>
+                            <option value="12">Medium (12 hours)</option>
+                            <option value="18">Slow (18 hours)</option>
+                            <option value="23">Very Slow (23 hours)</option>
                         </select>
-                        <p className="text-sm text-gray-600 mt-1">
-                            {weightSystem === 'current'
-                                ? `Earlier reviews receive higher rewards (${WEIGHT_SYSTEMS.current.weights.timing * 100}% weight).`
-                                : `Timing contributes to community participation (part of ${WEIGHT_SYSTEMS.proposed.weights.community * 100}% community weight).`
-                            }
-                        </p>
                     </div>
                     <div>
-                        <label className="block mb-2">Starting Reputation</label>
+                        <label className="flex items-center mb-2">
+                            Starting Reputation
+                            <ParameterHelp
+                                title="Reputation Impact"
+                                description={WEIGHT_SYSTEMS[weightSystem].helpText.reputation}
+                            />
+                        </label>
                         <input
                             type="number"
                             value={reputation}
@@ -449,75 +484,70 @@ const RewardAnalysis = () => {
                             step="0.1"
                             min="0"
                         />
-                        <p className="text-sm text-gray-600 mt-1">
-                            {weightSystem === 'current'
-                                ? `Your reputation score impacts rewards (${WEIGHT_SYSTEMS.current.weights.reputation * 100}% weight). Grows with successful reviews.`
-                                : `User ranking affects rewards (${WEIGHT_SYSTEMS.proposed.weights.ranking * 100}% weight) as part of the community-focused model.`
-                            }
-                        </p>
                     </div>
                 </div>
             </div>
 
             {/* Charts */}
-            <div className="mb-8">
-                <h3 className="text-xl mb-4">Review Balance Over Time</h3>
-                <LineChart
-                    width={800}
-                    height={400}
-                    data={data}
-                    margin={{ top: 20, right: 30, left: 60, bottom: 20 }}
-                >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis
-                        dataKey="cycle"
-                        label={{ value: 'Cycle', position: 'insideBottom', offset: -10 }}
-                    />
-                    <YAxis
-                        label={{ value: 'Balance (φ)', angle: -90, position: 'insideLeft', offset: -50 }}
-                    />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="reviewBalance" stroke="#82ca9d" name="Review Balance" />
-                </LineChart>
-            </div>
+            <div className="space-y-8">
+                <div className="p-4 border rounded-lg">
+                    <h3 className="text-xl mb-4">Balance Projection</h3>
+                    <LineChart
+                        width={800}
+                        height={400}
+                        data={data}
+                        margin={{ top: 20, right: 30, left: 60, bottom: 20 }}
+                    >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis
+                            dataKey="cycle"
+                            label={{ value: 'Review Cycle', position: 'insideBottom', offset: -10 }}
+                        />
+                        <YAxis
+                            label={{ value: 'Balance (φ)', angle: -90, position: 'insideLeft', offset: -50 }}
+                        />
+                        <Tooltip />
+                        <Line type="monotone" dataKey="reviewBalance" stroke="#82ca9d" name="Review Balance" dot={false} />
+                    </LineChart>
+                </div>
 
-            <div className="mb-8">
-                <h3 className="text-xl mb-4">Review ROI</h3>
-                <LineChart
-                    width={800}
-                    height={300}
-                    data={data}
-                    margin={{ top: 20, right: 30, left: 60, bottom: 20 }}
-                >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="cycle" />
-                    <YAxis
-                        label={{ value: 'ROI %', angle: -90, position: 'insideLeft', offset: -50 }}
-                        tickFormatter={(value) => `${value.toFixed(1)}%`}
-                    />
-                    <Tooltip formatter={(value) => `${value.toFixed(2)}%`} />
-                    <Line type="monotone" dataKey="reviewROI" stroke="#82ca9d" name="Review ROI" />
-                </LineChart>
-            </div>
+                <div className="p-4 border rounded-lg">
+                    <h3 className="text-xl mb-4">Return on Investment</h3>
+                    <LineChart
+                        width={800}
+                        height={300}
+                        data={data}
+                        margin={{ top: 20, right: 30, left: 60, bottom: 20 }}
+                    >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="cycle" />
+                        <YAxis
+                            label={{ value: 'ROI %', angle: -90, position: 'insideLeft', offset: -50 }}
+                            tickFormatter={(value) => `${value.toFixed(1)}%`}
+                        />
+                        <Tooltip formatter={(value) => `${value.toFixed(2)}%`} />
+                        <Line type="monotone" dataKey="reviewROI" stroke="#82ca9d" name="ROI" dot={false} />
+                    </LineChart>
+                </div>
 
-            <div className="mb-8">
-                <h3 className="text-xl mb-4">Rewards per Cycle</h3>
-                <LineChart
-                    width={800}
-                    height={300}
-                    data={data}
-                    margin={{ top: 20, right: 30, left: 60, bottom: 20 }}
-                >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="cycle" />
-                    <YAxis label={{ value: 'Rewards (φ)', angle: -90, position: 'insideLeft', offset: -50 }} />
-                    <Tooltip />
-                    <Line type="monotone" dataKey="reviewReward" stroke="#82ca9d" name="Review Reward" />
-                </LineChart>
+                <div className="p-4 border rounded-lg">
+                    <h3 className="text-xl mb-4">Rewards per Cycle</h3>
+                    <LineChart
+                        width={800}
+                        height={300}
+                        data={data}
+                        margin={{ top: 20, right: 30, left: 60, bottom: 20 }}
+                    >
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="cycle" />
+                        <YAxis label={{ value: 'Rewards (φ)', angle: -90, position: 'insideLeft', offset: -50 }} />
+                        <Tooltip />
+                        <Line type="monotone" dataKey="reviewReward" stroke="#82ca9d" name="Cycle Rewards" dot={false} />
+                    </LineChart>
+                </div>
             </div>
         </div>
     );
 };
 
 export default RewardAnalysis;
-
