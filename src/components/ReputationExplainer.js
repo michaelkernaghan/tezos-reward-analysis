@@ -71,6 +71,12 @@ const ReputationExplainer = () => {
               </p>
             </div>
           </div>
+          <div className="mt-4 bg-blue-50 p-3 rounded-md">
+            <p className="text-sm text-blue-800">
+              Note: The component weights above (40%, 40%, 10%, 5%, 5%) always sum to 100% of the total weight. 
+              This ensures that no review can have more than a total weight of 1.
+            </p>
+          </div>
         </div>
 
         <div className="bg-white rounded-lg shadow-sm border p-4">
