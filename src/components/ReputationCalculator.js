@@ -25,7 +25,7 @@ const AccurateReputationCalculator = () => {
 
   // Calculate stake score (stake/maxStake)
   const calculateStakeScore = (stake, maxStake) => {
-    return maxStake > 0 ? stake / maxStake : 0;
+    return Math.min(maxStake > 0 ? stake / maxStake : 0, 1);
   };
 
   // Calculate holdings score
@@ -35,7 +35,7 @@ const AccurateReputationCalculator = () => {
 
   // Calculate stake ratio
   const calculateStakeRatio = (stake, holdings) => {
-    return holdings > 0 ? stake / holdings : stake > 0 ? 1 : 0;
+    return Math.min(holdings > 0 ? stake / holdings : stake > 0 ? 1 : 0, 1);
   };
 
   // Calculate reputation score
@@ -45,7 +45,7 @@ const AccurateReputationCalculator = () => {
 
   // Calculate final weight using actual API weightings
   const calculatedScores = useMemo(() => {
-    const timeScore = calculateTimeScore(review.reviewSubmitTime);
+    const timeScore = Math.min(calculateTimeScore(review.reviewSubmitTime), 1);
     const stakeScore = calculateStakeScore(review.stake, systemState.maxStake);
     const holdingsScore = calculateHoldingsScore(review.tokenHoldings, systemState.totalHoldings);
     const stakeRatio = calculateStakeRatio(review.stake, review.tokenHoldings);
@@ -177,27 +177,57 @@ const AccurateReputationCalculator = () => {
         <div className="space-y-6">
           <div className="bg-white rounded-lg shadow-sm border p-4">
             <h2 className="text-lg font-semibold mb-3">Component Scores</h2>
-            <div className="space-y-2">
-              <div>
-                <span className="font-medium">Stake Score (40% weight): </span>
-                <span>{(calculatedScores.stakeScore * 0.4).toFixed(4)}</span>
+            <div className="space-y-4">
+              <div className="text-sm text-gray-600 mb-2">
+                Raw scores (before applying weights):
               </div>
               <div>
-                <span className="font-medium">Reputation Score (40% weight): </span>
-                <span>{(calculatedScores.reputationScore * 0.4).toFixed(4)}</span>
+                <span className="font-medium">Stake Score: </span>
+                <span>{calculatedScores.stakeScore.toFixed(4)}</span>
               </div>
               <div>
-                <span className="font-medium">Time Score (10% weight): </span>
-                <span>{(calculatedScores.timeScore * 0.1).toFixed(4)}</span>
+                <span className="font-medium">Reputation Score: </span>
+                <span>{calculatedScores.reputationScore.toFixed(4)}</span>
               </div>
               <div>
-                <span className="font-medium">Holdings Score (5% weight): </span>
-                <span>{(calculatedScores.holdingsScore * 0.05).toFixed(4)}</span>
+                <span className="font-medium">Time Score: </span>
+                <span>{calculatedScores.timeScore.toFixed(4)}</span>
               </div>
               <div>
-                <span className="font-medium">Stake Ratio Score (5% weight): </span>
-                <span>{(calculatedScores.stakeRatio * 0.05).toFixed(4)}</span>
+                <span className="font-medium">Holdings Score: </span>
+                <span>{calculatedScores.holdingsScore.toFixed(4)}</span>
               </div>
+              <div>
+                <span className="font-medium">Stake Ratio Score: </span>
+                <span>{calculatedScores.stakeRatio.toFixed(4)}</span>
+              </div>
+              
+              <div className="border-t pt-4 mt-4">
+                <div className="text-sm text-gray-600 mb-2">
+                  Weighted scores (after applying weights):
+                </div>
+                <div>
+                  <span className="font-medium">Stake (40%): </span>
+                  <span>{(calculatedScores.stakeScore * 0.4).toFixed(4)}</span>
+                </div>
+                <div>
+                  <span className="font-medium">Reputation (40%): </span>
+                  <span>{(calculatedScores.reputationScore * 0.4).toFixed(4)}</span>
+                </div>
+                <div>
+                  <span className="font-medium">Time (10%): </span>
+                  <span>{(calculatedScores.timeScore * 0.1).toFixed(4)}</span>
+                </div>
+                <div>
+                  <span className="font-medium">Holdings (5%): </span>
+                  <span>{(calculatedScores.holdingsScore * 0.05).toFixed(4)}</span>
+                </div>
+                <div>
+                  <span className="font-medium">Stake Ratio (5%): </span>
+                  <span>{(calculatedScores.stakeRatio * 0.05).toFixed(4)}</span>
+                </div>
+              </div>
+
               <div className="pt-4 border-t mt-4">
                 <span className="font-medium">Final Weight: </span>
                 <span>{calculatedScores.finalWeight.toFixed(4)}</span>
